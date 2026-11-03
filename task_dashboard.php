@@ -1,19 +1,31 @@
 <?php
+session_start();
 require_once 'Koneksi.php';
 header('Content-Type: application/json');
 
-try {
-    // Ambil SEMUA tugas (baik yang belum selesai maupun yang sudah)
-    // Diurutkan dari yang paling baru dibuat
-    $stmtTask = $pdo->query("SELECT id, title, description, status, created_at FROM tasks ORDER BY created_at DESC");
-    $tasks = $stmtTask->fetchAll(PDO::FETCH_ASSOC);
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Belum Login']);
+    exit;
+}
 
-    // Kirim data ke JS
+try {
+    // Ambil tugas yang HANYA milik user_id dari session aktif
+    $stmt = $pdo->prepare("SELECT id, title, status, marked FROM tasks WHERE user_id = :user_id ORDER BY id DESC");
+    $stmt->execute(['user_id' => $_SESSION['user_id']]);
+    $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Format marked ke boolean agar sesuai kebutuhan frontend JS
+    foreach ($tasks as &$task) {
+        $task['marked'] = (bool)$task['marked'];
+    }
+
     echo json_encode([
         'status' => 'success',
-        'tasks' => $tasks
+        'data'   => $tasks
     ]);
 } catch (PDOException $e) {
+    http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
 }
 ?>
